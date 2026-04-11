@@ -177,6 +177,43 @@ app.patch("/api/v1/bff/mobile/notifications/read-all", async (req, res) => {
   }
 });
 
+app.get("/api/v1/bff/mobile/notifications/preferences", async (req, res) => {
+  const headers = extractForwardHeaders(req);
+
+  try {
+    const response = await axios.get(
+      `${NOTIFICATION_BASE_URL}/api/v1/notifications/preferences`,
+      { headers },
+    );
+    res.status(response.status).json(response.data);
+  } catch (error) {
+    const statusCode = error.response?.status || 502;
+    res.status(statusCode).json({
+      error: "notification_preferences_get_failed",
+      message: error.response?.data || error.message,
+    });
+  }
+});
+
+app.patch("/api/v1/bff/mobile/notifications/preferences", async (req, res) => {
+  const headers = extractForwardHeaders(req);
+
+  try {
+    const response = await axios.patch(
+      `${NOTIFICATION_BASE_URL}/api/v1/notifications/preferences`,
+      req.body || {},
+      { headers },
+    );
+    res.status(response.status).json(response.data);
+  } catch (error) {
+    const statusCode = error.response?.status || 502;
+    res.status(statusCode).json({
+      error: "notification_preferences_update_failed",
+      message: error.response?.data || error.message,
+    });
+  }
+});
+
 app.get("/api/v1/bff/mobile/hydration", async (req, res) => {
   const headers = extractForwardHeaders(req);
 
