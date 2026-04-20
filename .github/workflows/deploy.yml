@@ -1,0 +1,29 @@
+name: Deploy BFF Service to EC2
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST_IP }}
+          username: ubuntu # (hoặc ec2-user nếu dùng Amazon Linux)
+          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          script: |
+            # 1. Di chuyển vào thư mục chứa code trên EC2 của bạn
+            # THAY ĐỔI ĐƯỜNG DẪN NÀY LẠI CHO ĐÚNG VỚI EC2 CỦA BẠN:
+            cd ~/HealthCareNow/bff-service
+            
+            # 2. Pull code mới nhất từ nhánh main
+            git pull origin main
+            
+            # 3. Pull code xong thì build và restart lại service qua Docker Compose
+            # LƯU Ý: Chỉnh lại tên service trong file docker-compose.yml của bạn nếu cần
+            docker-compose up -d --build bff-service
