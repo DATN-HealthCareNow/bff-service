@@ -214,6 +214,25 @@ app.patch("/api/v1/bff/mobile/notifications/preferences", async (req, res) => {
   }
 });
 
+app.post("/api/v1/bff/mobile/notifications/test-exercise", async (req, res) => {
+  const headers = extractForwardHeaders(req);
+
+  try {
+    const response = await axios.post(
+      `${NOTIFICATION_BASE_URL}/api/v1/notifications/test-exercise`,
+      {},
+      { headers },
+    );
+    res.status(response.status).json(response.data);
+  } catch (error) {
+    const statusCode = error.response?.status || 502;
+    res.status(statusCode).json({
+      error: "notification_test_exercise_failed",
+      message: error.response?.data || error.message,
+    });
+  }
+});
+
 app.get("/api/v1/bff/mobile/hydration", async (req, res) => {
   const headers = extractForwardHeaders(req);
 
