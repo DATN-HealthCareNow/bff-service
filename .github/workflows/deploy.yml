@@ -17,13 +17,19 @@ jobs:
           username: ubuntu # (hoặc ec2-user nếu dùng Amazon Linux)
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
           script: |
-            # 1. Di chuyển vào thư mục chứa code trên EC2 của bạn
-            # THAY ĐỔI ĐƯỜNG DẪN NÀY LẠI CHO ĐÚNG VỚI EC2 CỦA BẠN:
-            cd ~/HealthCareNow/bff-service
+            # 1. Di chuyển vào thư mục code và pull mới nhất
+            # Thử cả hai đường dẫn phổ biến, nếu sai bạn hãy thay bằng đường dẫn thực tế trên EC2
+            cd ~/bff-service || cd ~/HealthCareNow/bff-service || exit 1
             
-            # 2. Pull code mới nhất từ nhánh main
+            echo "Pulling latest code..."
             git pull origin main
             
-            # 3. Pull code xong thì build và restart lại service qua Docker Compose
-            # LƯU Ý: Chỉnh lại tên service trong file docker-compose.yml của bạn nếu cần
-            docker-compose up -d --build bff-service
+            # 2. Di chuyển sang thư mục devops để chạy Docker Compose (vì file config nằm ở đó)
+            cd ~/devops-service || cd ~/HealthCareNow/devops-service || exit 1
+            
+            # 3. Sử dụng 'docker compose' thay vì 'docker-compose' và dùng sudo nếu cần
+            echo "Restarting bff-service..."
+            sudo docker compose up -d --build bff-service
+            
+            # 4. Dọn dẹp image cũ
+            sudo docker image prune -f
