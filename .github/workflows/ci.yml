@@ -103,4 +103,4 @@ jobs:
             sudo docker compose up -d bff-service
             
             echo "4. Dọn dẹp các Image cũ để tránh đầy ổ cứng server..."
-            sudo docker image prune -f
+            sudo docker image prune -f || true
