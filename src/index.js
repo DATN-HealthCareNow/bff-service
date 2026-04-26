@@ -10,6 +10,7 @@ const PORT = process.env.PORT || 8090;
 const CORE_BASE_URL = process.env.CORE_BASE_URL || "http://core-service:8081";
 const IOT_BASE_URL = process.env.IOT_BASE_URL || "http://iot-service:8082";
 const NOTIFICATION_BASE_URL = process.env.NOTIFICATION_BASE_URL || "http://notification-service:8084";
+const AI_BASE_URL = process.env.AI_BASE_URL || "http://ai-service:8000";
 
 const server = http.createServer(app);
 const wsServer = new WebSocketServer({ noServer: true });
@@ -290,6 +291,117 @@ app.get("/api/v1/bff/mobile/home", async (req, res) => {
     const statusCode = error.response?.status || 502;
     res.status(statusCode).json({
       error: "home_aggregate_failed",
+      message: error.response?.data || error.message,
+    });
+  }
+});
+
+// ── Health Insights (Aggregate → AI) ────────────────────────────────────────
+app.get("/api/v1/bff/mobile/health-insights", async (req, res) => {
+  const headers = extractForwardHeaders(req);
+  const userId = headers["x-user-id"];
+
+  if (!userId) {
+    return res.status(401).json({ error: "missing_user_context" });
+  }
+
+  try {
+    // Step 1: Fetch user profile from core-service
+    const profileResp = await axios.get(
+      `${CORE_BASE_URL}/api/v1/users/profile`,
+      { headers }
+    );
+    const profile = profileResp.data;
+
+    // Step 2: Compute date range — last 7 days
+    const today = new Date();
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 6);
+    const startDate = sevenDaysAgo.toISOString().split("T")[0];
+    const endDate = today.toISOString().split("T")[0];
+
+    // Step 3: Fetch 7-day daily health data from iot-service
+    const dailyResp = await axios.get(
+      `${IOT_BASE_URL}/api/v1/tracking/report`,
+      {
+        headers,
+        params: { startDate, endDate },
+      }
+    );
+    const rawDailyData = Array.isArray(dailyResp.data) ? dailyResp.data : [];
+
+    // Step 4: Transform into ai-service expected format
+    // Parse user age from dateOfBirth
+    let age = 25;
+    if (profile.dateOfBirth) {
+      const birth = new Date(profile.dateOfBirth);
+      age = Math.floor((Date.now() - birth.getTime()) / (365.25 * 24 * 3600 * 1000));
+    }
+
+    const genderEncoded = profile.gender === "MALE" ? 1 : 0;
+    const language = req.headers["accept-language"]?.startsWith("en") ? "en" : "vi";
+
+    const dailyData = rawDailyData.map((d) => ({
+      date: d.dateString || d.dateStringLocal,
+      steps: d.metrics?.steps ?? null,
+      distance_meters: d.metrics?.distanceMeters ?? null,
+      active_calories: d.metrics?.activeCalories ?? null,
+      total_calories: d.metrics?.totalCalories ?? null,
+      sleep_minutes: (d.metrics?.sleepMinutes === 0 || d.metrics?.sleepMinutes == null) ? null : d.metrics.sleepMinutes,
+      heart_rate: (d.metrics?.heartRate === 0 || d.metrics?.heartRate == null) ? null : d.metrics.heartRate,
+      resting_heart_rate: (d.metrics?.restingHeartRate === 0 || d.metrics?.restingHeartRate == null) ? null : d.metrics.restingHeartRate,
+    }));
+
+    // Step 5: Call ai-service
+    const aiResp = await axios.post(
+      `${AI_BASE_URL}/ai/v1/health-insights`,
+      {
+        user_profile: {
+          age,
+          gender: genderEncoded,
+          height_cm: profile.heightCm || 170,
+          weight_kg: profile.weightKg || 65,
+          language,
+        },
+        daily_data: dailyData,
+        window_days: 7,
+      },
+      { timeout: 30000 } // 30s timeout for Gemini
+    );
+
+    res.status(200).json(aiResp.data);
+  } catch (error) {
+    const statusCode = error.response?.status || 502;
+    console.error("[bff] health-insights error:", error.message);
+    res.status(statusCode).json({
+      error: "health_insights_failed",
+      message: error.response?.data || error.message,
+    });
+  }
+});
+
+// ── Health Chat ───────────────────────────────────────────────────────────────
+app.post("/api/v1/bff/mobile/health-chat", async (req, res) => {
+  const headers = extractForwardHeaders(req);
+  const userId = headers["x-user-id"];
+
+  if (!userId) {
+    return res.status(401).json({ error: "missing_user_context" });
+  }
+
+  try {
+    // Forward directly to ai-service with user profile from body
+    const aiResp = await axios.post(
+      `${AI_BASE_URL}/ai/v1/health-chat`,
+      req.body,
+      { timeout: 20000 }
+    );
+    res.status(200).json(aiResp.data);
+  } catch (error) {
+    const statusCode = error.response?.status || 502;
+    console.error("[bff] health-chat error:", error.message);
+    res.status(statusCode).json({
+      error: "health_chat_failed",
       message: error.response?.data || error.message,
     });
   }
