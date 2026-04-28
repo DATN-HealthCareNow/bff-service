@@ -341,31 +341,40 @@ app.get("/api/v1/bff/mobile/health-insights", async (req, res) => {
     const genderEncoded = profile.gender === "MALE" ? 1 : 0;
     const language = req.headers["accept-language"]?.startsWith("en") ? "en" : "vi";
 
-    const dailyData = rawDailyData.map((d) => ({
-      date: d.dateString || d.dateStringLocal,
-      steps: d.metrics?.steps ?? null,
-      distance_meters: d.metrics?.distanceMeters ?? null,
-      active_calories: d.metrics?.activeCalories ?? null,
-      total_calories: d.metrics?.totalCalories ?? null,
-      sleep_minutes: (d.metrics?.sleepMinutes === 0 || d.metrics?.sleepMinutes == null) ? null : d.metrics.sleepMinutes,
-      heart_rate: (d.metrics?.heartRate === 0 || d.metrics?.heartRate == null) ? null : d.metrics.heartRate,
-      resting_heart_rate: (d.metrics?.restingHeartRate === 0 || d.metrics?.restingHeartRate == null) ? null : d.metrics.restingHeartRate,
-    }));
+    const dailyData = rawDailyData.map((d) => {
+      // Ensure date is a string (fallback to today if missing)
+      const dateStr = d.dateString || d.dateStringLocal || new Date().toISOString().split("T")[0];
+      
+      return {
+        date: String(dateStr),
+        steps: d.metrics?.steps != null ? Number(d.metrics.steps) : null,
+        distance_meters: d.metrics?.distanceMeters != null ? Number(d.metrics.distanceMeters) : null,
+        active_calories: d.metrics?.activeCalories != null ? Math.round(Number(d.metrics.activeCalories)) : null,
+        total_calories: d.metrics?.totalCalories != null ? Math.round(Number(d.metrics.totalCalories)) : null,
+        sleep_minutes: (d.metrics?.sleepMinutes === 0 || d.metrics?.sleepMinutes == null) ? null : Math.round(Number(d.metrics.sleepMinutes)),
+        heart_rate: (d.metrics?.heartRate === 0 || d.metrics?.heartRate == null) ? null : Math.round(Number(d.metrics.heartRate)),
+        resting_heart_rate: (d.metrics?.restingHeartRate === 0 || d.metrics?.restingHeartRate == null) ? null : Math.round(Number(d.metrics.restingHeartRate)),
+      };
+    });
+
+    const aiPayload = {
+      user_profile: {
+        age: Number(age),
+        gender: Number(genderEncoded),
+        height_cm: Number(profile.heightCm || 170),
+        weight_kg: Number(profile.weightKg || 65),
+        language: String(language),
+      },
+      daily_data: dailyData,
+      window_days: 7,
+    };
+
+    console.log("[bff] Sending to ai-service:", JSON.stringify(aiPayload, null, 2));
 
     // Step 5: Call ai-service
     const aiResp = await axios.post(
       `${AI_BASE_URL}/ai/v1/health-insights`,
-      {
-        user_profile: {
-          age,
-          gender: genderEncoded,
-          height_cm: profile.heightCm || 170,
-          weight_kg: profile.weightKg || 65,
-          language,
-        },
-        daily_data: dailyData,
-        window_days: 7,
-      },
+      aiPayload,
       { timeout: 30000 } // 30s timeout for Gemini
     );
 
