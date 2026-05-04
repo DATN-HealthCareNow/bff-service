@@ -342,7 +342,6 @@ app.get("/api/v1/bff/mobile/health-insights", async (req, res) => {
     const language = req.headers["accept-language"]?.startsWith("en") ? "en" : "vi";
 
     const dailyData = rawDailyData.map((d) => {
-      // Ensure date is a string (fallback to today if missing)
       const dateStr = d.dateString || d.dateStringLocal || new Date().toISOString().split("T")[0];
       
       return {
