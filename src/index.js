@@ -342,7 +342,6 @@ app.get("/api/v1/bff/mobile/health-insights", async (req, res) => {
     const language = req.headers["accept-language"]?.startsWith("en") ? "en" : "vi";
 
     const dailyData = rawDailyData.map((d) => {
-      // Ensure date is a string (fallback to today if missing)
       const dateStr = d.dateString || d.dateStringLocal || new Date().toISOString().split("T")[0];
       
       return {
@@ -413,6 +412,120 @@ app.post("/api/v1/bff/mobile/health-chat", async (req, res) => {
       error: "health_chat_failed",
       message: error.response?.data || error.message,
     });
+  }
+});
+
+// ── RAG Sync Helper ───────────────────────────────────────────────────────────
+/**
+ * Fire-and-forget: sync a health record to AI Vector DB.
+ * Non-blocking — does NOT affect the main API response.
+ */
+const ragSyncRecord = (userId, recordType, recordData) => {
+  if (!userId || !recordData) return;
+  axios
+    .post(`${AI_BASE_URL}/ai/v1/rag/sync`, {
+      user_id: userId,
+      record_type: recordType,
+      record_data: recordData,
+    })
+    .then(() => {
+      console.log(`[bff][RAG] Synced ${recordType} for user=${userId}`);
+    })
+    .catch((err) => {
+      // Non-fatal: log and continue. RAG sync failure must never break the main flow.
+      console.warn(`[bff][RAG] Sync failed for ${recordType} (user=${userId}):`, err.message);
+    });
+};
+
+// ── Medical Records — RAG-aware proxy ────────────────────────────────────────
+
+// GET list (proxy only, no sync needed)
+app.get("/api/v1/medical-records", async (req, res) => {
+  const headers = extractForwardHeaders(req);
+  try {
+    const resp = await axios.get(`${CORE_BASE_URL}/api/v1/medical-records`, { headers, params: req.query });
+    res.status(resp.status).json(resp.data);
+  } catch (err) {
+    res.status(err.response?.status || 502).json({ error: "medical_records_list_failed", message: err.message });
+  }
+});
+
+// POST create — sync to Vector DB after save
+app.post("/api/v1/medical-records", async (req, res) => {
+  const headers = extractForwardHeaders(req);
+  const userId = headers["x-user-id"];
+  try {
+    const resp = await axios.post(`${CORE_BASE_URL}/api/v1/medical-records`, req.body, { headers });
+    res.status(resp.status).json(resp.data);
+
+    // 🔥 RAG Sync (after response sent to client)
+    ragSyncRecord(userId, "medical_record", resp.data);
+  } catch (err) {
+    res.status(err.response?.status || 502).json({ error: "medical_record_create_failed", message: err.message });
+  }
+});
+
+// POST scan image (OCR) — sync result to Vector DB
+app.post("/api/v1/medical-records/scan", async (req, res) => {
+  const headers = extractForwardHeaders(req);
+  const userId = headers["x-user-id"];
+  try {
+    const resp = await axios.post(`${CORE_BASE_URL}/api/v1/medical-records/scan`, req.body, { headers });
+    res.status(resp.status).json(resp.data);
+
+    // 🔥 RAG Sync
+    ragSyncRecord(userId, "medical_record", resp.data);
+  } catch (err) {
+    res.status(err.response?.status || 502).json({ error: "medical_record_scan_failed", message: err.message });
+  }
+});
+
+// ── Meals — RAG-aware proxy ───────────────────────────────────────────────────
+
+// GET macros (proxy only)
+app.get("/api/v1/meals/macros", async (req, res) => {
+  const headers = extractForwardHeaders(req);
+  try {
+    const resp = await axios.get(`${CORE_BASE_URL}/api/v1/meals/macros`, { headers, params: req.query });
+    res.status(resp.status).json(resp.data);
+  } catch (err) {
+    res.status(err.response?.status || 502).json({ error: "meals_macros_failed", message: err.message });
+  }
+});
+
+// POST log a meal — sync to Vector DB
+app.post("/api/v1/meals", async (req, res) => {
+  const headers = extractForwardHeaders(req);
+  const userId = headers["x-user-id"];
+  try {
+    const resp = await axios.post(`${CORE_BASE_URL}/api/v1/meals`, req.body, { headers });
+    res.status(resp.status).json(resp.data);
+
+    // 🔥 RAG Sync
+    ragSyncRecord(userId, "meal", resp.data);
+  } catch (err) {
+    res.status(err.response?.status || 502).json({ error: "meal_log_failed", message: err.message });
+  }
+});
+
+// ── Workout — RAG-aware proxy ─────────────────────────────────────────────────
+
+// POST finish workout — sync completed session to Vector DB
+app.post("/api/v1/activities/:activityId/finish", async (req, res) => {
+  const headers = extractForwardHeaders(req);
+  const userId = headers["x-user-id"];
+  try {
+    const resp = await axios.post(
+      `${CORE_BASE_URL}/api/v1/activities/${req.params.activityId}/finish`,
+      req.body,
+      { headers }
+    );
+    res.status(resp.status).json(resp.data);
+
+    // 🔥 RAG Sync — include activityId for upsert deduplication
+    ragSyncRecord(userId, "workout", { ...resp.data, id: req.params.activityId });
+  } catch (err) {
+    res.status(err.response?.status || 502).json({ error: "workout_finish_failed", message: err.message });
   }
 });
 
