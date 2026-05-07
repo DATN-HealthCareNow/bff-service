@@ -256,6 +256,20 @@ app.get("/api/v1/bff/mobile/hydration", async (req, res) => {
   }
 });
 
+app.get("/api/v1/bff/mobile/hydration/logs", async (req, res) => {
+  const headers = extractForwardHeaders(req);
+  try {
+    const response = await axios.get(`${IOT_BASE_URL}/api/v1/water/logs`, { headers });
+    res.json(Array.isArray(response.data) ? response.data : []);
+  } catch (error) {
+    const statusCode = error.response?.status || 502;
+    res.status(statusCode).json({
+      error: "hydration_logs_fetch_failed",
+      message: error.response?.data || error.message,
+    });
+  }
+});
+
 app.post("/api/v1/bff/mobile/hydration/log", async (req, res) => {
   const headers = extractForwardHeaders(req);
 
