@@ -320,6 +320,16 @@ app.get("/api/v1/bff/mobile/health-insights", async (req, res) => {
   }
 
   try {
+    // Check AI Predict Quota
+    const quotaResp = await axios.post(
+      `${CORE_BASE_URL}/api/v1/subscription/check-quota`,
+      null,
+      { headers, params: { featureType: "AI_PREDICT" } }
+    );
+    if (quotaResp.data && quotaResp.data.allowed === false) {
+      return res.status(403).json({ error: "quota_exceeded", message: "Daily quota exceeded for AI Health Predict." });
+    }
+
     // Step 1: Fetch user profile from core-service
     const profileResp = await axios.get(
       `${CORE_BASE_URL}/api/v1/users/profile`,
@@ -412,6 +422,16 @@ app.post("/api/v1/bff/mobile/health-chat", async (req, res) => {
   }
 
   try {
+    // Check AI Chat Quota
+    const quotaResp = await axios.post(
+      `${CORE_BASE_URL}/api/v1/subscription/check-quota`,
+      null,
+      { headers, params: { featureType: "AI_CHAT_TOKEN" } }
+    );
+    if (quotaResp.data && quotaResp.data.allowed === false) {
+      return res.status(403).json({ error: "quota_exceeded", message: "Daily quota exceeded for AI Chat." });
+    }
+
     // Forward directly to ai-service with user profile from body
     const aiResp = await axios.post(
       `${AI_BASE_URL}/ai/v1/health-chat`,
@@ -484,6 +504,16 @@ app.post("/api/v1/medical-records/scan", async (req, res) => {
   const headers = extractForwardHeaders(req);
   const userId = headers["x-user-id"];
   try {
+    // Check Medical Scan Quota
+    const quotaResp = await axios.post(
+      `${CORE_BASE_URL}/api/v1/subscription/check-quota`,
+      null,
+      { headers, params: { featureType: "MEDICAL_SCAN" } }
+    );
+    if (quotaResp.data && quotaResp.data.allowed === false) {
+      return res.status(403).json({ error: "quota_exceeded", message: "Total quota exceeded for Medical Scans." });
+    }
+
     const resp = await axios.post(`${CORE_BASE_URL}/api/v1/medical-records/scan`, req.body, { headers });
     res.status(resp.status).json(resp.data);
 
