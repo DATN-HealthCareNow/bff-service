@@ -345,10 +345,10 @@ app.get("/api/v1/bff/mobile/health-insights", async (req, res) => {
     const rawDailyData = Array.isArray(dailyResp.data) ? dailyResp.data : [];
 
     // Step 4: Transform into ai-service expected format
-    // Parse user age from dateOfBirth
+    // Parse user age from date_of_birth
     let age = 25;
-    if (profile.dateOfBirth) {
-      const birth = new Date(profile.dateOfBirth);
+    if (profile.date_of_birth) {
+      const birth = new Date(profile.date_of_birth);
       age = Math.floor((Date.now() - birth.getTime()) / (365.25 * 24 * 3600 * 1000));
     }
 
@@ -374,8 +374,8 @@ app.get("/api/v1/bff/mobile/health-insights", async (req, res) => {
       user_profile: {
         age: Number(age),
         gender: Number(genderEncoded),
-        height_cm: Number(profile.heightCm || 170),
-        weight_kg: Number(profile.weightKg || 65),
+        height_cm: Number(profile.height_cm || 170),
+        weight_kg: Number(profile.weight_kg || 65),
         language: String(language),
       },
       daily_data: dailyData,
