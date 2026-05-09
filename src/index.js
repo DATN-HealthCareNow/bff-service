@@ -374,8 +374,8 @@ app.get("/api/v1/bff/mobile/health-insights", async (req, res) => {
       user_profile: {
         age: Number(age),
         gender: Number(genderEncoded),
-        height_cm: Number(profile.height_cm || 170),
-        weight_kg: Number(profile.weight_kg || 65),
+        height_cm: Number(profile.height || 170),
+        weight_kg: Number(profile.weight || 65),
         language: String(language),
       },
       daily_data: dailyData,
