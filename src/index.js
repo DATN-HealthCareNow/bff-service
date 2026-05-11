@@ -330,15 +330,7 @@ app.get("/api/v1/bff/mobile/health-insights", async (req, res) => {
       return res.status(403).json({ error: "quota_exceeded", message: "Daily quota exceeded for AI Health Predict." });
     }
 
-    // Check AI Meals Quota
-    const mealQuotaResp = await axios.post(
-      `${CORE_BASE_URL}/api/v1/subscription/check-quota`,
-      null,
-      { headers, params: { featureType: "AI_MEALS" } }
-    );
-    if (mealQuotaResp.data && mealQuotaResp.data.allowed === false) {
-      return res.status(403).json({ error: "quota_exceeded", message: "Daily quota exceeded for AI Meals." });
-    }
+
 
     // Step 1: Fetch user profile from core-service
     const profileResp = await axios.get(
