@@ -414,6 +414,72 @@ app.get("/api/v1/bff/mobile/health-insights", async (req, res) => {
   }
 });
 
+// ── AI Meal Plan — quota-gated proxy to ai-service ──────────────────────────
+app.post("/api/v1/bff/mobile/ai/predict", async (req, res) => {
+  const headers = extractForwardHeaders(req);
+  const userId = headers["x-user-id"];
+
+  if (!userId) {
+    return res.status(401).json({ error: "missing_user_context" });
+  }
+
+  try {
+    // Check AI Meals Quota
+    const quotaResp = await axios.post(
+      `${CORE_BASE_URL}/api/v1/subscription/check-quota`,
+      null,
+      { headers, params: { featureType: "AI_MEALS" } }
+    );
+    if (quotaResp.data && quotaResp.data.allowed === false) {
+      return res.status(403).json({ error: "quota_exceeded", message: "Daily quota exceeded for AI Meal Plan." });
+    }
+
+    // Forward to ai-service
+    const aiResp = await axios.post(`${AI_BASE_URL}/ai/predict`, req.body, { timeout: 30000 });
+    res.status(200).json(aiResp.data);
+  } catch (error) {
+    const statusCode = error.response?.status || 502;
+    console.error("[bff] ai/predict error:", error.message);
+    res.status(statusCode).json({
+      error: "ai_predict_failed",
+      message: error.response?.data || error.message,
+    });
+  }
+});
+
+// ── AI Health Forecast — quota-gated proxy to ai-service ─────────────────────
+app.post("/api/v1/bff/mobile/health-forecast", async (req, res) => {
+  const headers = extractForwardHeaders(req);
+  const userId = headers["x-user-id"];
+
+  if (!userId) {
+    return res.status(401).json({ error: "missing_user_context" });
+  }
+
+  try {
+    // Check AI Predict Quota
+    const quotaResp = await axios.post(
+      `${CORE_BASE_URL}/api/v1/subscription/check-quota`,
+      null,
+      { headers, params: { featureType: "AI_PREDICT" } }
+    );
+    if (quotaResp.data && quotaResp.data.allowed === false) {
+      return res.status(403).json({ error: "quota_exceeded", message: "Daily quota exceeded for AI Health Predict." });
+    }
+
+    // Forward to ai-service
+    const aiResp = await axios.post(`${AI_BASE_URL}/api/v1/analysis/health-forecast`, req.body, { timeout: 30000 });
+    res.status(200).json(aiResp.data);
+  } catch (error) {
+    const statusCode = error.response?.status || 502;
+    console.error("[bff] health-forecast error:", error.message);
+    res.status(statusCode).json({
+      error: "health_forecast_failed",
+      message: error.response?.data || error.message,
+    });
+  }
+});
+
 // ── Health Chat ───────────────────────────────────────────────────────────────
 app.post("/api/v1/bff/mobile/health-chat", async (req, res) => {
   const headers = extractForwardHeaders(req);
@@ -502,7 +568,7 @@ app.post("/api/v1/medical-records", async (req, res) => {
 });
 
 // POST scan image (OCR) — sync result to Vector DB
-app.post("/api/v1/medical-records/scan", async (req, res) => {
+app.post("/api/v1/bff/mobile/medical/scan", async (req, res) => {
   const headers = extractForwardHeaders(req);
   const userId = headers["x-user-id"];
   try {
@@ -516,13 +582,16 @@ app.post("/api/v1/medical-records/scan", async (req, res) => {
       return res.status(403).json({ error: "quota_exceeded", message: "Total quota exceeded for Medical Scans." });
     }
 
+    // Forward to core-service
     const resp = await axios.post(`${CORE_BASE_URL}/api/v1/medical-records/scan`, req.body, { headers });
     res.status(resp.status).json(resp.data);
 
     // 🔥 RAG Sync
     ragSyncRecord(userId, "medical_record", resp.data);
   } catch (err) {
-    res.status(err.response?.status || 502).json({ error: "medical_record_scan_failed", message: err.message });
+    const statusCode = err.response?.status || 502;
+    console.error("[bff] medical/scan error:", err.message);
+    res.status(statusCode).json({ error: "medical_record_scan_failed", message: err.message });
   }
 });
 
