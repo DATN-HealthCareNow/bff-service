@@ -320,14 +320,14 @@ app.get("/api/v1/bff/mobile/health-insights", async (req, res) => {
   }
 
   try {
-    // Check AI Predict Quota
+    // Check AI Insights Quota
     const quotaResp = await axios.post(
       `${CORE_BASE_URL}/api/v1/subscription/check-quota`,
       null,
-      { headers, params: { featureType: "AI_PREDICT" } }
+      { headers, params: { featureType: "AI_INSIGHTS" } }
     );
     if (quotaResp.data && quotaResp.data.allowed === false) {
-      return res.status(403).json({ error: "quota_exceeded", message: "Daily quota exceeded for AI Health Predict." });
+      return res.status(403).json({ error: "quota_exceeded", message: "Daily quota exceeded for AI Health Insights." });
     }
 
 
@@ -415,7 +415,7 @@ app.get("/api/v1/bff/mobile/health-insights", async (req, res) => {
 });
 
 // ── AI Meal Plan — quota-gated proxy to ai-service ──────────────────────────
-app.post("/api/v1/bff/mobile/ai/predict", async (req, res) => {
+app.post("/api/v1/bff/mobile/ai/meal", async (req, res) => {
   const headers = extractForwardHeaders(req);
   const userId = headers["x-user-id"];
 
@@ -439,9 +439,9 @@ app.post("/api/v1/bff/mobile/ai/predict", async (req, res) => {
     res.status(200).json(aiResp.data);
   } catch (error) {
     const statusCode = error.response?.status || 502;
-    console.error("[bff] ai/predict error:", error.message);
+    console.error("[bff] ai/meal error:", error.message);
     res.status(statusCode).json({
-      error: "ai_predict_failed",
+      error: "ai_meal_failed",
       message: error.response?.data || error.message,
     });
   }
