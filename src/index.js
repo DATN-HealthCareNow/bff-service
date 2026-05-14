@@ -320,7 +320,8 @@ app.get("/api/v1/bff/mobile/health-insights", async (req, res) => {
   }
 
   try {
-    // Check AI Insights Quota
+    // Check AI Insights Quota (Disabled by user request - "Soul of the app")
+    /*
     const quotaResp = await axios.post(
       `${CORE_BASE_URL}/api/v1/subscription/check-quota`,
       null,
@@ -329,6 +330,7 @@ app.get("/api/v1/bff/mobile/health-insights", async (req, res) => {
     if (quotaResp.data && quotaResp.data.allowed === false) {
       return res.status(403).json({ error: "quota_exceeded", message: "Daily quota exceeded for AI Health Insights." });
     }
+    */
 
 
 
