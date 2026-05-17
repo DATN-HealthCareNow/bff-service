@@ -519,6 +519,32 @@ app.post("/api/v1/bff/mobile/health-chat", async (req, res) => {
   }
 });
 
+// ── Health Proactive Coaching ────────────────────────────────────────────────
+app.post("/api/v1/bff/mobile/health-proactive", async (req, res) => {
+  const headers = extractForwardHeaders(req);
+  const userId = headers["x-user-id"];
+
+  if (!userId) {
+    return res.status(401).json({ error: "missing_user_context" });
+  }
+
+  try {
+    const aiResp = await axios.post(
+      `${AI_BASE_URL}/ai/v1/health-proactive`,
+      req.body,
+      { timeout: 10000 }
+    );
+    res.status(200).json(aiResp.data);
+  } catch (error) {
+    const statusCode = error.response?.status || 502;
+    console.error("[bff] health-proactive error:", error.message);
+    res.status(statusCode).json({
+      error: "health_proactive_failed",
+      message: error.response?.data || error.message,
+    });
+  }
+});
+
 // ── RAG Sync Helper ───────────────────────────────────────────────────────────
 /**
  * Fire-and-forget: sync a health record to AI Vector DB.
