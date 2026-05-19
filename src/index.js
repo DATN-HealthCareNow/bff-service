@@ -506,7 +506,7 @@ app.post("/api/v1/bff/mobile/health-chat", async (req, res) => {
     const aiResp = await axios.post(
       `${AI_BASE_URL}/ai/v1/health-chat`,
       req.body,
-      { timeout: 20000 }
+      { timeout: 45000 }  // 45s — tool calling needs 2 Gemini roundtrips
     );
     res.status(200).json(aiResp.data);
   } catch (error) {
